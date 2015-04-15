@@ -11,13 +11,30 @@ import cookielib,urllib2,urllib
 
 # Logger
 def Logger(pMessage):
-    file = open('/var/log/veoliaconnect.log', 'a')
-    file.write("%s/n" % pMessage)
+    file = open('veoliaconnect.log', 'a')
+    file.write("%s\n" % pMessage)
     file.close()
-
-# On active le support des cookies pour urllib2
-cookiejar = cookielib.CookieJar()
-urlOpener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookiejar))
+    
+class URL:
+    
+    def __init__(self):
+        # On active le support des cookies pour urllib2
+        cookiejar = cookielib.CookieJar()
+        self.urlOpener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookiejar))
+    
+    def call(self, url, params = None, referer = None, output = None):
+        Logger('Calling url')
+        data = None if params == None else urllib.urlencode(params)
+        request = urllib2.Request(url, data)
+        if referer is not None:
+            request.add_header('Referer', referer)
+        response = self.urlOpener.open(request)
+        Logger(" -> %s" % response.getcode())
+        if output is not None:
+            file = open(output, 'w')
+            file.write(response.read())
+            file.close()
+        return response
 
 # Parse arguments
 parser = argparse.ArgumentParser()
@@ -50,60 +67,38 @@ if not args.web and args.spreadsheet is None:
     
 # WebSite gathering
 if args.web:
+    url = URL()
+    
     urlConnect = 'https://www.service-client.veoliaeau.fr/home.loginAction.do#inside-space'
     urlConso1 = 'https://www.service-client.veoliaeau.fr/home/espace-client/votre-consommation.html'
     urlConso2 = 'https://www.service-client.veoliaeau.fr/home/espace-client/votre-consommation.html?vueConso=historique'
     urlXls = 'https://www.service-client.veoliaeau.fr/home/espace-client/votre-consommation.exportConsommationData.do?vueConso=historique'
     urlDisconnect = 'https://www.service-client.veoliaeau.fr/logout'
     
-    param = {'veolia_username' : args.login,
-             'veolia_password' : args.password,
-             'login' : 'OK'}
-    
     # Connect to Veolia website
     Logger('Connection au site Véolia Eau')
-    data = urllib.urlencode(param)
-    request = urllib2.Request(urlConnect, data)
-    request.add_header('Referer', 'https://www.service-client.veoliaeau.fr/home.html')
-    response = urlOpener.open(request)
-    Logger(response.getcode())
-    Logger(response.info())
-    #file = open('/tmp/home.html', 'w')
-    #file.write(response.read())
-    #file.close()
+    params = {'veolia_username' : args.login,
+         'veolia_password' : args.password,
+         'login' : 'OK'}
+    referer = 'https://www.service-client.veoliaeau.fr/home.html'
+    url.call(urlConnect, params, referer)
     
-    # page votre consomation
-    #print 'Conso 1'
-    response = urlOpener.open(urlConso1)
-    #print response.getcode()
-    #print response.info()
-    #file = open('/tmp/conso1.html', 'w')
-    #file.write(response.read())
-    #file.close()
+    # Page 'votre consomation'
+    Logger('Page de consommation')
+    url.call(urlConso1)
     
-    #print 'Conso 2'
-    response = urlOpener.open(urlConso2)
-    #print response.getcode()
-    #print response.info()
-    #file = open('/tmp/conso2.html', 'w')
-    #file.write(response.read())
-    #file.close()
+    # Page 'votre consomation : historique'
+    Logger('Page de consommation : historique')
+    url.call(urlConso2)
     
     # Download XLS file
-    #print 'Téléchargement du fichier'
-    response = urlOpener.open(urlXls)
-    #print response.getcode()
-    #print response.info()
+    Logger('Téléchargement du fichier')
+    response = url.call(urlXls)
     content = response.read()
-    #file = open('/tmp/data.xls', 'w')
-    #file.write(content)
-    #file.close()
     
-    #logout
-    #print "Déconnection du site Véolia Eau"
-    response = urlOpener.open(urlDisconnect)
-    #print response.getcode()
-    #print response.info()
+    # logout
+    Logger('Déconnection du site Véolia Eau')
+    url.call(urlDisconnect)
 
 # Get external spreadsheet content
 if args.spreadsheet is not None:
